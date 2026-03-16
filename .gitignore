@@ -1,1 +1,17 @@
+# Virtual Environment
 venv/
+.venv/
+env/
+bin/
+lib/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment Secrets
+.env
+
+# OS files
+.DS_Store

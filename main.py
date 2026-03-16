@@ -20,24 +20,25 @@ RISK_PER_TRADE = 0.01  # 1% Risk ($270)
 
 def get_market_analysis():
     """Fetches data and performs technical analysis."""
-    # 1. Sector Leadership (Relative Strength over last 4 weeks)
+    # 1. Sector Leadership (using auto_adjust=True)
     sector_tickers = list(SECTORS.values())
-    s_data = yf.download(sector_tickers, period="2mo", interval="1d")['Adj Close']
+    s_data = yf.download(sector_tickers, period="2mo", interval="1d", auto_adjust=True)['Close']
     sector_perf = ((s_data.iloc[-1] / s_data.iloc[-20]) - 1) * 100
     top_sectors = sector_perf.sort_values(ascending=False)
 
-    # 2. Stock Scanning & Position Sizing
-    stock_data = yf.download(WATCHLIST, period="3mo", interval="1d")
+    # 2. Stock Scanning & Position Sizing (using auto_adjust=True)
+    stock_data = yf.download(WATCHLIST, period="3mo", interval="1d", auto_adjust=True)
     setups = []
 
     for ticker in WATCHLIST:
         df = stock_data.xs(ticker, axis=1, level=1)
-        price = df['Adj Close'].iloc[-1]
+        # Change 'Adj Close' to 'Close' here
+        price = df['Close'].iloc[-1] 
         
-        # Calculate ATR for stop-loss (Standard 14-day)
+        # ... rest of your ATR calculation ...
         high_low = df['High'] - df['Low']
-        high_cp = abs(df['High'] - df['Adj Close'].shift())
-        low_cp = abs(df['Low'] - df['Adj Close'].shift())
+        high_cp = abs(df['High'] - df['Close'].shift()) # Use 'Close' here too
+        low_cp = abs(df['Low'] - df['Close'].shift())   # Use 'Close' here too
         tr = pd.concat([high_low, high_cp, low_cp], axis=1).max(axis=1)
         atr = tr.rolling(14).mean().iloc[-1]
         
