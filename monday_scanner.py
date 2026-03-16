@@ -153,15 +153,25 @@ def write_to_ledger_and_alert(sheet, setups, locked_tickers, skipped_earnings, r
     
     discord_text = ""
     for s in setups:
+        # Write to Google Sheet
         sheet.append_row([
             today_str, s['ticker'], "BUY", round(s['price'], 2), "", 
             round(s['stop'], 2), round(s['target'], 2), s['shares'], "PENDING_FILL"
         ])
         
+        # Calculate capital, potential gains, and theoretical risk
         capital_req = s['shares'] * s['price']
+        
+        potential_gain_dlr = (s['target'] - s['price']) * s['shares']
+        potential_gain_pct = ((s['target'] / s['price']) - 1) * 100
+        
+        potential_risk_dlr = (s['price'] - s['stop']) * s['shares']
+        potential_risk_pct = (1 - (s['stop'] / s['price'])) * 100
+        
         discord_text += f"**{s['ticker']}** ({s['sector']}) @ ~${s['price']:.2f}\n"
         discord_text += f"↳ Target: ${s['target']:.2f} | Stop: ${s['stop']:.2f}\n"
-        discord_text += f"↳ Size: {s['shares']} shares (Est. Cap: ${capital_req:,.2f})\n\n"
+        discord_text += f"↳ Size: {s['shares']} shares (Est. Cap: ${capital_req:,.2f})\n"
+        discord_text += f"↳ **Est. Gain:** ${potential_gain_dlr:,.2f} (+{potential_gain_pct:.1f}%) | **Est. Risk:** ${potential_risk_dlr:,.2f} (-{potential_risk_pct:.1f}%)\n\n"
 
     embed.add_embed_field(name="Recommendations added to Ledger", value=discord_text if discord_text else "No valid setups found.", inline=False)
     
