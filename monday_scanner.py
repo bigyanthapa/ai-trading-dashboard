@@ -26,7 +26,23 @@ def connect_to_sheets():
     creds_dict = json.loads(creds_json)
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
-    return client.open(SHEET_NAME).worksheet("Ledger")
+    spreadsheet = client.open(SHEET_NAME)
+    
+    try:
+        # Try to find the specific tab
+        return spreadsheet.worksheet("Ledger")
+    except gspread.exceptions.WorksheetNotFound:
+        print("Tab 'Ledger' not found. Auto-renaming the first tab...")
+        # Fallback: Grab the first tab and rename it
+        first_sheet = spreadsheet.get_worksheet(0)
+        first_sheet.update_title("Ledger")
+        
+        # Self-healing: If row 1 is empty, inject the headers
+        if not first_sheet.row_values(1):
+            headers = ['Date', 'Ticker', 'Action', 'Suggested Entry', 'Actual Fill', 'Stop Loss', 'Target Exit', 'Shares', 'Status']
+            first_sheet.append_row(headers)
+            
+        return first_sheet
 
 def run_monday_scan():
     """Finds the top 3 momentum setups and calculates risk-adjusted entry/exit."""
