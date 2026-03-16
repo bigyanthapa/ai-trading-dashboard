@@ -1,0 +1,32 @@
+name: Friday Trade Retrospective
+
+on:
+  schedule:
+    # 20:15 UTC = 3:15 PM CDT (Runs every Friday)
+    - cron: '15 20 * * 5'
+  workflow_dispatch:
+
+jobs:
+  run-friday-retro:
+    runs-on: ubuntu-latest
+    
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Install Dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Friday Retro
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
+        run: python friday_retro.py
