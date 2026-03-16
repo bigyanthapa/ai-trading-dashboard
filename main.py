@@ -39,9 +39,10 @@ def get_market_analysis():
     sector_perf = ((s_data.iloc[-1] / s_data.iloc[-20]) - 1) * 100
     top_sectors = sector_perf.sort_values(ascending=False)
 
-    # 2. Benchmark (SPY) - Unified 5-day lookback
-    spy_data = yf.download("SPY", period="1mo", interval="1d", auto_adjust=True)['Close']
-    spy_perf_5d = ((spy_data.iloc[-1] / spy_data.iloc[-6]) - 1) * 100
+    # 2. Benchmark (SPY) 
+    # FIX 1: Applied .squeeze() to ensure it becomes a Series, not a DataFrame
+    spy_data = yf.download("SPY", period="1mo", interval="1d", auto_adjust=True)['Close'].squeeze()
+    spy_perf_5d = float(((spy_data.iloc[-1] / spy_data.iloc[-6]) - 1) * 100)
 
     # 3. Stock Scanning
     stock_data = yf.download(WATCHLIST, period="3mo", interval="1d", auto_adjust=True)
@@ -66,7 +67,6 @@ def get_market_analysis():
             stop_loss = price - (2 * atr)
             
             # --- STOP LOSS WARNING LOGIC ---
-            # Flag if price is within 2% of the stop loss
             proximity_to_stop = (price - stop_loss) / price
             risk_alert = True if proximity_to_stop <= 0.02 else False
             
@@ -83,29 +83,40 @@ def get_market_analysis():
 
     return top_sectors, sorted(setups, key=lambda x: x['rs_score'], reverse=True), spy_perf_5d
 
+def format_trade_plans(top_setups):
+    """Restored the missing plans function."""
+    plans = ""
+    for s in top_setups:
+        if s['ticker'] == "NVDA":
+            plans += f"**NVDA Plan:** Pivot at $180. If holds, target $195. Stop: ${s['stop']:.2f}\n"
+        if s['ticker'] == "TSLA":
+            plans += f"**TSLA Plan:** Resistance at $405. Watch for break. Stop: ${s['stop']:.2f}\n"
+    return plans
+
 def send_to_discord(sectors, setups, plans, spy_perf):
     webhook_url = os.getenv('DISCORD_WEBHOOK')
+    if not webhook_url:
+        print("CRITICAL: DISCORD_WEBHOOK secret not found.")
+        return
+
     webhook = DiscordWebhook(url=webhook_url)
     color = "3498db" if spy_perf > 0 else "e67e22"
     embed = DiscordEmbed(title="🚀 Weekly AI Swing Dashboard", color=color)
 
     embed.add_embed_field(name="📊 Benchmark", value=f"**SPY 5-Day:** {spy_perf:.2f}%", inline=False)
 
-    # 1. High Risk / Stop Loss Alerts
     alerts = [f"⚠️ **{s['ticker']}** is near stop: ${s['stop']:.2f}" for s in setups if s['risk_alert']]
     if alerts:
         embed.add_embed_field(name="🚨 Risk Alerts (Price < 2% from Stop)", value="\n".join(alerts), inline=False)
 
-    # 2. Sector Leadership
     leader_text = "\n".join([f"**{k}**: {sectors[v]:.1f}%" for k, v in list(SECTORS.items())[:3]])
     embed.add_embed_field(name="🔥 Top Sectors (4W)", value=leader_text, inline=True)
 
-    # 3. Top 5 Setups (Fixed redundancy)
     setup_text = ""
     for s in setups[:5]:
         rs_icon = "📈" if s['rs_score'] > 0 else "📉"
         setup_text += f"**{s['ticker']}**: ${s['price']:.2f} ({s['perf']:.1f}%) | {s['sentiment']}\n"
-        setup_text += f"↳ RS vs SPY: {s['rs_score']:+.2f}% {rs_icon} | Size: {s['shares']}\n"
+        setup_text += f"↳ RS vs SPY: {s['rs_score']:+.2f}% {rs_icon} | Size: {s['shares']}\n\n"
     
     embed.add_embed_field(name="🚀 Top Swing Setups", value=setup_text, inline=False)
     embed.add_embed_field(name="🎯 Ticker Trade Plans", value=plans if plans else "No core plans.", inline=False)
@@ -116,7 +127,10 @@ def send_to_discord(sectors, setups, plans, spy_perf):
 
 if __name__ == "__main__":
     print("Running Weekly Market Scan...")
-    sectors, setups = get_market_analysis()
+    
+    # FIX 2 & 3: Correctly unpack 3 variables, generate plans, and pass 4 arguments
+    sectors, setups, spy_perf = get_market_analysis()
     plans = format_trade_plans(setups)
-    send_to_discord(sectors, setups, plans)
+    send_to_discord(sectors, setups, plans, spy_perf)
+    
     print("Dashboard sent to Discord.")
