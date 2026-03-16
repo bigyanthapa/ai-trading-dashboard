@@ -1,0 +1,32 @@
+name: Monday Swing Scanner
+
+on:
+  schedule:
+    # 13:45 UTC = 8:45 AM CDT (Runs every Monday)
+    - cron: '45 13 * * 1'
+  workflow_dispatch:
+
+jobs:
+  run-monday-scan:
+    runs-on: ubuntu-latest
+    
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Install Dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Monday Scanner
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
+        run: python monday_scanner.py
