@@ -10,7 +10,6 @@ from discord_webhook import DiscordWebhook, DiscordEmbed
 SHEET_NAME = "Swing Trade Ledger"
 
 def get_spreadsheet():
-    """Authenticates and returns the Google Spreadsheet object."""
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     creds_json = os.environ.get('GCP_CREDENTIALS')
     if not creds_json:
@@ -22,11 +21,9 @@ def get_spreadsheet():
     return client.open(SHEET_NAME)
 
 def get_or_create_wash_sales(spreadsheet):
-    """Ensures the Wash_Sales tab exists to track 30-day lockouts."""
     try:
         return spreadsheet.worksheet("Wash_Sales")
     except gspread.exceptions.WorksheetNotFound:
-        print("Creating Wash_Sales tab...")
         ws = spreadsheet.add_worksheet(title="Wash_Sales", rows="100", cols="2")
         ws.append_row(["Ticker", "Lockout_End_Date"])
         return ws
@@ -43,54 +40,71 @@ def run_friday_retro():
     discord_report = []
     wash_sale_alerts = []
 
-    # gspread rows are 1-indexed, and row 1 is headers. So data starts at row 2.
+    # gspread rows are 1-indexed, row 1 is headers. Data starts at row 2.
     for i, row in enumerate(records, start=2):
         status = str(row.get('Status', '')).strip().upper()
         ticker = row.get('Ticker', '')
         
-        # Clean up PENDING trades that were never filled
         if status == 'PENDING_FILL':
-            ledger.update_cell(i, 9, 'EXPIRED') # Column I is Status
+            ledger.update_cell(i, 9, 'EXPIRED') # Column I
             continue
             
-        if status == 'ACTIVE' and ticker:
+        if status in ['ACTIVE', 'FREE_RIDE'] and ticker:
             try:
-                # 1. Gather Trade Data
-                # Fallback to Suggested Entry if Actual Fill is left blank
                 entry_price = float(row.get('Actual Fill') or row.get('Suggested Entry'))
                 stop_loss = float(row.get('Stop Loss'))
-                target = float(row.get('Target Exit'))
                 shares = int(row.get('Shares'))
                 
-                # 2. Fetch Current Market Price
+                # Fetch Current Market Price
                 current_price = yf.download(ticker, period="1d", interval="1d", auto_adjust=True)['Close'].iloc[-1]
                 current_price = float(current_price)
                 
-                # 3. Calculate PnL
                 pnl_dollars = (current_price - entry_price) * shares
                 pnl_pct = ((current_price / entry_price) - 1) * 100
                 
-                new_status = 'HOLDING'
+                new_status = status
+                action_note = ""
                 
-                # 4. Evaluate Exit Conditions
-                if current_price <= stop_loss:
-                    new_status = 'CLOSED_LOSS'
-                    lockout_date = (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d')
-                    wash_sales_sheet.append_row([ticker, lockout_date])
-                    wash_sale_alerts.append(f"🛑 **{ticker}**: Wash sale triggered. Locked until {lockout_date}.")
-                    
-                elif current_price >= target:
-                    new_status = 'CLOSED_WIN'
+                # --- ACTIVE PHASE LOGIC ---
+                if status == 'ACTIVE':
+                    target = float(row.get('Target Exit'))
+                    if current_price <= stop_loss:
+                        new_status = 'CLOSED_LOSS'
+                        lockout_date = (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d')
+                        wash_sales_sheet.append_row([ticker, lockout_date])
+                        wash_sale_alerts.append(f"🛑 **{ticker}**: Wash sale. Locked until {lockout_date}.")
+                        ledger.update_cell(i, 9, new_status)
+                        
+                    elif current_price >= target:
+                        new_status = 'FREE_RIDE'
+                        new_shares = shares // 2
+                        
+                        # 1. Move Stop Loss to Break-Even (Col F is 6)
+                        ledger.update_cell(i, 6, entry_price) 
+                        # 2. Cut Shares in half (Col H is 8)
+                        ledger.update_cell(i, 8, new_shares)  
+                        # 3. Update Status (Col I is 9)
+                        ledger.update_cell(i, 9, new_status)  
+                        
+                        action_note = "🎯 **TAKE HALF!** Target hit. Stop moved to break-even."
+                        pnl_dollars = (current_price - entry_price) * new_shares # Recalculate for remaining
                 
-                # Update the sheet if the trade closed
-                if new_status != 'ACTIVE':
-                    ledger.update_cell(i, 9, new_status) # Column I
-                
-                # 5. Format the Discord Report String
+                # --- FREE RIDE PHASE LOGIC ---
+                elif status == 'FREE_RIDE':
+                    if current_price <= stop_loss:
+                        new_status = 'CLOSED_WIN' # Stopped out at break-even
+                        ledger.update_cell(i, 9, new_status)
+                        action_note = "🛡️ **STOPPED OUT** at break-even. Free ride ended."
+                    else:
+                        action_note = "🌊 **RIDING TREND** risk-free."
+
+                # --- FORMAT DISCORD OUTPUT ---
                 icon = "🟢" if pnl_dollars > 0 else "🔴"
                 report_line = f"{icon} **{ticker}** ({new_status})\n"
+                if action_note:
+                    report_line += f"↳ {action_note}\n"
                 report_line += f"↳ Entry: ${entry_price:.2f} | Current: ${current_price:.2f}\n"
-                report_line += f"↳ PnL: **${pnl_dollars:,.2f}** ({pnl_pct:+.2f}%)\n"
+                report_line += f"↳ Open PnL: **${pnl_dollars:,.2f}** ({pnl_pct:+.2f}%)\n"
                 discord_report.append(report_line)
 
             except Exception as e:
