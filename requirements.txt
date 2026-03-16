@@ -1,14 +1,13 @@
-beautifulsoup4==4.14.3
 certifi==2026.2.25
 cffi==2.0.0
 charset-normalizer==3.4.6
 curl_cffi==0.13.0
-discord-webhook==1.4.1
+
 frozendict==2.4.7
 idna==3.11
 multitasking==0.0.12
 numpy==2.4.3
-pandas==3.0.1
+
 peewee==4.0.2
 platformdirs==4.9.4
 protobuf==7.34.0
@@ -21,4 +20,9 @@ soupsieve==2.8.3
 typing_extensions==4.15.0
 urllib3==2.6.3
 websockets==16.0
-yfinance==1.2.0
+
+yfinance>=1.2.0
+pandas>=2.2.0,<3.0.0
+discord-webhook>=1.4.1
+beautifulsoup4>=4.12.0
+requests>=2.31.0
