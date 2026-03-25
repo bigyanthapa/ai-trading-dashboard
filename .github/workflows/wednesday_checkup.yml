@@ -1,0 +1,32 @@
+name: Wednesday Mid-Week Checkup
+
+on:
+  schedule:
+    # 17:00 UTC = 12:00 PM CDT (Midday Wednesday)
+    - cron: '0 17 * * 3'
+  workflow_dispatch: # Allows you to run it manually anytime
+
+jobs:
+  run-checkup:
+    runs-on: ubuntu-latest
+    
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Install Dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Wednesday Checkup Script
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
+        run: python wednesday_checkup.py
