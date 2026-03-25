@@ -46,7 +46,7 @@ def run_friday_retro():
         ticker = row.get('Ticker', '')
         
         if status == 'PENDING_FILL':
-            ledger.update_cell(i, 9, 'EXPIRED') # Column I
+            ledger.update_cell(i, 10, 'EXPIRED') # Status is now Column 10
             continue
             
         if status in ['ACTIVE', 'FREE_RIDE'] and ticker:
@@ -73,18 +73,18 @@ def run_friday_retro():
                         lockout_date = (datetime.now() + timedelta(days=30)).strftime('%Y-%m-%d')
                         wash_sales_sheet.append_row([ticker, lockout_date])
                         wash_sale_alerts.append(f"🛑 **{ticker}**: Wash sale. Locked until {lockout_date}.")
-                        ledger.update_cell(i, 9, new_status)
+                        ledger.update_cell(i, 10, new_status) # Status is Col 10
                         
                     elif current_price >= target:
                         new_status = 'FREE_RIDE'
                         new_shares = shares // 2
                         
-                        # 1. Move Stop Loss to Break-Even (Col F is 6)
+                        # 1. Move Stop Loss to Break-Even (Col 6)
                         ledger.update_cell(i, 6, entry_price) 
-                        # 2. Cut Shares in half (Col H is 8)
-                        ledger.update_cell(i, 8, new_shares)  
-                        # 3. Update Status (Col I is 9)
-                        ledger.update_cell(i, 9, new_status)  
+                        # 2. Cut Shares in half (Shares is now Col 9)
+                        ledger.update_cell(i, 9, new_shares)  
+                        # 3. Update Status (Status is now Col 10)
+                        ledger.update_cell(i, 10, new_status)  
                         
                         action_note = "🎯 **TAKE HALF!** Target hit. Stop moved to break-even."
                         pnl_dollars = (current_price - entry_price) * new_shares # Recalculate for remaining
@@ -93,7 +93,7 @@ def run_friday_retro():
                 elif status == 'FREE_RIDE':
                     if current_price <= stop_loss:
                         new_status = 'CLOSED_WIN' # Stopped out at break-even
-                        ledger.update_cell(i, 9, new_status)
+                        ledger.update_cell(i, 10, new_status) # Status is Col 10
                         action_note = "🛡️ **STOPPED OUT** at break-even. Free ride ended."
                     else:
                         action_note = "🌊 **RIDING TREND** risk-free."

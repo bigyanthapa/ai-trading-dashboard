@@ -47,15 +47,21 @@ def calculate_equity_curve():
             target = float(row.get('Target Exit'))
             shares = int(row.get('Shares'))
             
+            # Fetch the new column
+            actual_exit_val = row.get('Actual Exit', '')
+            
             pnl = 0
-            if status == 'CLOSED_LOSS':
-                # Full loss calculated from entry to stop
-                pnl = (stop - entry) * shares
-            elif status in ['FREE_RIDE', 'CLOSED_WIN']:
-                # If it hit FREE_RIDE, we booked half the original position at the Target Exit.
-                # Since the Friday script halves the 'Shares' cell when it hits FREE_RIDE, 
-                # the current 'shares' value is exactly the amount we sold at the target.
-                pnl = (target - entry) * shares
+            
+            # If you manually entered an exact exit price, use it for perfect accuracy
+            if actual_exit_val != "":
+                pnl = (float(actual_exit_val) - entry) * shares
+            else:
+                # Fallback to theoretical math if the cell is blank
+                if status == 'CLOSED_LOSS':
+                    pnl = (stop - entry) * shares
+                elif status in ['FREE_RIDE', 'CLOSED_WIN']:
+                    # Assuming we booked half the original position at the Target Exit
+                    pnl = (target - entry) * shares
                 
             trade_data.append({'Date': date_str, 'PnL': pnl, 'Ticker': row.get('Ticker')})
 
