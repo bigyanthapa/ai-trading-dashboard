@@ -15,6 +15,10 @@ CORE_SECTORS = {
     "GOOGL": "Comm", "PYPL": "Financials", "VOO": "Index", "BAC": "Financials", 
     "DAL": "Industrials", "ATEC": "Health", "F": "Consumer", "GE": "Industrials", "XOM": "Energy"
 }
+
+# NEW: Designate tickers that are allowed to use the Momentum Risk Profile
+MEGA_CAP_MOMENTUM = ["NVDA", "TSLA", "MSFT", "ORCL", "AMZN", "AMD", "MU", "GE", "META", "AAPL"] 
+
 ACCOUNT_SIZE = 27000 
 RISK_PER_TRADE = 0.01 
 BASE_ALLOCATION = 2000 
@@ -35,7 +39,8 @@ def connect_to_sheets():
     except gspread.exceptions.WorksheetNotFound:
         first_sheet = spreadsheet.get_worksheet(0)
         first_sheet.update_title("Ledger")
-        first_sheet.append_row(['Date', 'Ticker', 'Action', 'Suggested Entry', 'Actual Fill', 'Stop Loss', 'Target Exit', 'Actual Exit', 'Shares', 'Status'])
+        # UPDATED: Added 'Setup Type' to the headers for new sheet creation
+        first_sheet.append_row(['Date', 'Ticker', 'Action', 'Suggested Entry', 'Actual Fill', 'Stop Loss', 'Target Exit', 'Actual Exit', 'Shares', 'Status', 'Setup Type'])
         return spreadsheet, first_sheet
 
 def get_wash_sale_lockouts(spreadsheet):
@@ -66,12 +71,12 @@ def get_dynamic_universe(sample_size=40):
         # Randomly sample the S&P 500 to keep the scan fresh and avoid yfinance timeouts
         random_sample = random.sample(sp500_tickers, sample_size)
         
-        # Combine core and random sample, removing duplicates
-        combined_universe = list(set(CORE_UNIVERSE + random_sample))
+        # UPDATED: Combine core, momentum, and random sample, removing duplicates
+        combined_universe = list(set(CORE_UNIVERSE + MEGA_CAP_MOMENTUM + random_sample))
         return combined_universe, df # Return df to extract sectors later
     except Exception as e:
         print(f"Failed to fetch S&P 500: {e}")
-        return CORE_UNIVERSE, None
+        return list(set(CORE_UNIVERSE + MEGA_CAP_MOMENTUM)), None
 
 def get_market_regime():
     try:
@@ -110,7 +115,6 @@ def run_monday_scan(locked_tickers, allocation_multiplier):
     scan_universe, sp500_df = get_dynamic_universe()
     print(f"Scanning {len(scan_universe)} tickers...")
     
-    # We now fetch 1 year of data to ensure the 200-day SMA can calculate
     stock_data = yf.download(scan_universe, period="1y", interval="1d", auto_adjust=True)
     target_capital = BASE_ALLOCATION * allocation_multiplier
     raw_setups = []
@@ -127,7 +131,7 @@ def run_monday_scan(locked_tickers, allocation_multiplier):
             df = stock_data.xs(ticker, axis=1, level=1).copy()
             df = df.dropna()
             if len(df) < 200:
-                continue # Skip if not enough data for 200 SMA
+                continue 
                 
             price = df['Close'].iloc[-1]
             
@@ -137,7 +141,7 @@ def run_monday_scan(locked_tickers, allocation_multiplier):
             ema_21 = df['Close'].ewm(span=21, adjust=False).mean().iloc[-1]
             rsi = calculate_rsi(df['Close']).iloc[-1]
             
-            # Trend Filter: Price must be above 21 EMA for short-term momentum
+            # Trend Filter
             if price < ema_21:
                 continue 
             
@@ -152,8 +156,20 @@ def run_monday_scan(locked_tickers, allocation_multiplier):
             tr = pd.concat([high_low, high_cp, low_cp], axis=1).max(axis=1)
             atr = tr.rolling(14).mean().iloc[-1]
             
-            stop_loss = price - (2 * atr)
-            target_exit = price + (4 * atr)
+            # --- NEW: DYNAMIC RISK ENGINE ---
+            is_momentum_ticker = ticker in MEGA_CAP_MOMENTUM
+            
+            if is_momentum_ticker and price > sma_50:
+                stop_multiplier = 1.5
+                target_multiplier = 2.25 # 1:1.5 R/R
+                setup_type = "🚀 Momentum Track"
+            else:
+                stop_multiplier = 2.0
+                target_multiplier = 4.0 # 1:2 R/R
+                setup_type = "🛡️ Standard ATR"
+
+            stop_loss = price - (stop_multiplier * atr)
+            target_exit = price + (target_multiplier * atr)
             
             # Risk Sizing
             risk_per_share = price - stop_loss
@@ -161,7 +177,7 @@ def run_monday_scan(locked_tickers, allocation_multiplier):
             if shares == 0:
                 continue
                 
-            # Estimated Hold Time (Assuming directional drift is ~40% of ATR per day)
+            # Estimated Hold Time
             distance_to_target = target_exit - price
             est_days = distance_to_target / (atr * 0.4)
             est_weeks = round(est_days / 5, 1)
@@ -173,7 +189,7 @@ def run_monday_scan(locked_tickers, allocation_multiplier):
             if not sector and sp500_df is not None:
                 sector_match = sp500_df[sp500_df['Symbol'] == ticker.replace('-', '.')]
                 if not sector_match.empty:
-                    sector = sector_match['GICS Sector'].iloc[0][:10] # Truncate long sector names
+                    sector = sector_match['GICS Sector'].iloc[0][:10] 
             sector = sector or "Unknown"
 
             raw_setups.append({
@@ -181,7 +197,8 @@ def run_monday_scan(locked_tickers, allocation_multiplier):
                 "stop": stop_loss, "target": target_exit, "shares": shares,
                 "sector": sector, "sma_50": sma_50, "sma_200": sma_200, 
                 "ema_21": ema_21, "rsi": rsi, "trend": trend_status, 
-                "golden_cross": is_golden_cross, "est_weeks": est_weeks
+                "golden_cross": is_golden_cross, "est_weeks": est_weeks,
+                "setup_type": setup_type # <-- NEW
             })
         except Exception as e:
             pass 
@@ -215,10 +232,11 @@ def write_to_ledger_and_alert(sheet, setups, locked_tickers, skipped_earnings, r
     
     discord_text = ""
     for s in setups:
-        # Write to Google Sheet
+        # UPDATED: Appending the setup_type to the new column in Sheets
         sheet.append_row([
             today_str, s['ticker'], "BUY", round(s['price'], 2), "", 
-            round(s['stop'], 2), round(s['target'], 2), "", s['shares'], "PENDING_FILL"
+            round(s['stop'], 2), round(s['target'], 2), "", s['shares'], "PENDING_FILL",
+            s['setup_type']
         ])
         
         # Financial Math
@@ -232,7 +250,8 @@ def write_to_ledger_and_alert(sheet, setups, locked_tickers, skipped_earnings, r
         gx_emoji = "✅" if s['golden_cross'] else "❌"
         hold_text = f"~{s['est_weeks']} weeks" if s['est_weeks'] >= 1.0 else "Under 1 week"
         
-        discord_text += f"**{s['ticker']}** ({s['sector']}) @ ~${s['price']:.2f}\n"
+        # UPDATED: Display setup track in the Discord message
+        discord_text += f"**{s['ticker']}** ({s['sector']}) @ ~${s['price']:.2f} | {s['setup_type']}\n"
         discord_text += f"↳ Target: ${s['target']:.2f} | Stop: ${s['stop']:.2f}\n"
         discord_text += f"↳ Size: {s['shares']} shares (Est. Cap: ${capital_req:,.2f})\n"
         discord_text += f"↳ **Gain:** ${pot_gain_dlr:,.2f} (+{pot_gain_pct:.1f}%) | **Risk:** ${pot_risk_dlr:,.2f} (-{pot_risk_pct:.1f}%)\n"
