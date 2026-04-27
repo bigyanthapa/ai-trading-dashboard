@@ -4,6 +4,7 @@ on:
   schedule:
     # 2:00 PM CST = 20:00 UTC (CST is UTC-6)
     - cron: '0 20 * * 1-5'  # Monday-Friday at 20:00 UTC (2:00 PM CST)
+  workflow_dispatch:
 
 jobs:
   position-mgmt:

@@ -4,6 +4,7 @@ on:
   schedule:
     # 5:00 PM CST Friday = 23:00 UTC Friday (CST is UTC-6)
     - cron: '0 23 * * 5'  # Friday at 23:00 UTC (5:00 PM CST)
+  workflow_dispatch:
 
 jobs:
   weekly-wrap-up:

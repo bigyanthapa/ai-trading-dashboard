@@ -4,6 +4,7 @@ on:
   schedule:
     # 9:30 AM CST = 15:30 UTC (CST is UTC-6)
     - cron: '30 15 * * 1-5'  # Monday-Friday at 15:30 UTC (9:30 AM CST)
+  workflow_dispatch:
 
 jobs:
   entry-alert:
