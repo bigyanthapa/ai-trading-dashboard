@@ -1,0 +1,38 @@
+name: Entry Alert Check (9:30 AM)
+
+on:
+  schedule:
+    # 9:30 AM CST = 15:30 UTC (CST is UTC-6)
+    - cron: '30 15 * * 1-5'  # Monday-Friday at 15:30 UTC (9:30 AM CST)
+
+jobs:
+  entry-alert:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install yfinance pandas discord-webhook requests
+      
+      - name: Run entry alert check
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          python entry_alert.py
+      
+      - name: Notify on success
+        if: success()
+        run: echo "✅ Entry alert sent successfully"
+      
+      - name: Notify on failure
+        if: failure()
+        run: echo "❌ Entry alert failed"
