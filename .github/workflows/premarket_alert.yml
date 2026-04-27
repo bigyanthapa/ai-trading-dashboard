@@ -1,0 +1,38 @@
+name: Pre-Market Swing Trade Scan
+
+on:
+  schedule:
+    # 8:00 AM CST = 14:00 UTC (CST is UTC-6)
+    - cron: '0 14 * * 1-5'  # Monday-Friday at 14:00 UTC (8:00 AM CST)
+
+jobs:
+  premarket-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install yfinance pandas discord-webhook requests
+      
+      - name: Run pre-market scan
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          python premarket_alert.py
+      
+      - name: Notify on success
+        if: success()
+        run: echo "✅ Pre-market alert sent successfully"
+      
+      - name: Notify on failure
+        if: failure()
+        run: echo "❌ Pre-market alert failed"

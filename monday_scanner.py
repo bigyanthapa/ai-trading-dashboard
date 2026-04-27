@@ -59,7 +59,7 @@ def get_wash_sale_lockouts(spreadsheet):
     except gspread.exceptions.WorksheetNotFound:
         return set()
 
-def get_dynamic_universe(sample_size=40):
+def get_dynamic_universe(sample_size=100):
     """Scrapes the S&P 500 and returns a dynamic list of tickers combined with the core universe."""
     try:
         url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
@@ -208,14 +208,17 @@ def run_monday_scan(locked_tickers, allocation_multiplier):
     
     # SECTOR CORRELATION FILTER
     final_setups = []
-    selected_sectors = set()
+    sector_counts = {}
     
     for s in raw_setups:
-        if s['sector'] in selected_sectors and s['sector'] != "Index":
+        current_count = sector_counts.get(s['sector'], 0)
+        
+        # Allow up to 2 stocks per sector (unless it's an Index, which is unlimited)
+        if current_count >= 2 and s['sector'] != "Index":
             continue 
             
         final_setups.append(s)
-        selected_sectors.add(s['sector'])
+        sector_counts[s['sector']] = current_count + 1
         
         if len(final_setups) >= 5:
             break
