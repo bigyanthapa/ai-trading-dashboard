@@ -116,7 +116,7 @@ Use this template to fill in your actual trades:
                 status_emoji = "🔴"
                 text = f"LOSS {pnl:.1f}%"
             
-            setup_status += f"{status_emoji} **{ticker}**: ${current:.2f} ({text}) | RSI: {rsi:.0f if rsi else 'N/A'}\n"
+            setup_status += f"{status_emoji} **{ticker}**: ${current:.2f} ({text}) | RSI: {rsi:.0f if rsi is not None else 'N/A'}\n"
     
     embed.add_embed_field(
         name="🎯 TOP SETUPS THIS WEEK",

@@ -85,20 +85,20 @@ def analyze_position(ticker, entry, current, target_1, target_2, stop_loss):
         action = f"🟢🟢 HIT TARGET 2 - BOOK REMAINING PROFIT at ${target_2:.2f}"
         action += f"\n└─ Close full position, lock in gains"
         color = "1abc9c"
-    elif rsi and rsi > 75:
+    elif rsi is not None and rsi > 75:
         action = f"🟡 TIGHTEN STOPS - RSI {rsi:.0f} (overbought)"
         action += f"\n└─ Move stop to ${entry + (risk_per_share * 0.5):.2f} (lock in half profit)"
         color = "f39c12"
-    elif rsi and rsi > 65:
+    elif rsi is not None and rsi > 65:
         action = f"🟢 TRAIL STOP - RSI {rsi:.0f} (strong)"
         action += f"\n└─ Move stop to breakeven + 2% (${entry * 1.02:.2f})"
         color = "3498db"
-    elif rsi and rsi < 30:
+    elif rsi is not None and rsi < 30:
         action = f"🟢 ADD TO POSITION - RSI {rsi:.0f} (oversold)"
         action += f"\n└─ Buy dip if support holding"
         color = "e74c3c"
     else:
-        action = f"🟢 HOLD FULL POSITION - RSI {rsi:.0f if rsi else 'N/A'}"
+        action = f"🟢 HOLD FULL POSITION - RSI {rsi:.0f if rsi is not None else 'N/A'}"
         action += f"\n└─ Wait for Target 1 at ${target_1:.2f}"
         color = "3498db"
     
