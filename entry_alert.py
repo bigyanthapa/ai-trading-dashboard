@@ -147,7 +147,7 @@ def main():
             setup["current_price"] = get_current_price(ticker)
         
         rsi = get_rsi_status(ticker)
-        rsi_text = f"(RSI: {rsi:.0f})" if rsi else ""
+        rsi_text = f"(RSI: {rsi:.0f})" if rsi is not None else ""
         
         entry_text += f"""
 {setup['conviction']} **{ticker}** {setup['status']}
