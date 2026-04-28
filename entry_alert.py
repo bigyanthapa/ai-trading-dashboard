@@ -146,12 +146,16 @@ def main():
         if setup["current_price"] is None:
             setup["current_price"] = get_current_price(ticker)
         
+        # Handle case where price couldn't be fetched
+        if setup["current_price"] is None:
+            continue
+        
         rsi = get_rsi_status(ticker)
-        rsi_text = f"(RSI: {rsi:.0f})" if rsi is not None else ""
+        rsi_text = f"(RSI: {rsi:.0f})" if rsi is not None and not pd.isna(rsi) else ""
         
         entry_text += f"""
 {setup['conviction']} **{ticker}** {setup['status']}
-├─ Price: ${setup['current_price']:.2f} {rsi_text}
+├─ Price: ${float(setup['current_price']):.2f} {rsi_text}
 ├─ Entry: ${setup['entry_zone']} | Buy Trigger: ${setup['buy_trigger']:.2f}
 ├─ Stop: ${setup['stop_loss']} | Targets: ${setup['target_1']} / ${setup['target_2']}
 ├─ R/R: 1:{(setup['target_1']-setup['buy_trigger'])/(setup['buy_trigger']-setup['stop_loss']):.1f}

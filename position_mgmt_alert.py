@@ -57,13 +57,28 @@ def get_current_price(ticker):
     try:
         data = yf.download(ticker, period="1d", interval="1m", auto_adjust=True, progress=False)
         if len(data) > 0:
-            return data['Close'].iloc[-1]
+            price = data['Close'].iloc[-1]
+            # Ensure we return a scalar value, not a Series
+            return float(price) if price is not None and not pd.isna(price) else None
         return None
     except:
         return None
 
 def analyze_position(ticker, entry, current, target_1, target_2, stop_loss):
     """Analyze position and provide action"""
+    
+    # Ensure current is a scalar value
+    if hasattr(current, 'iloc'):
+        current = float(current.iloc[-1])
+    elif current is None or (hasattr(current, '__len__') and len(current) == 0):
+        return None
+    else:
+        try:
+            current = float(current)
+            if pd.isna(current):
+                return None
+        except (TypeError, ValueError):
+            return None
     
     # Calculate metrics
     pnl_pct = ((current - entry) / entry) * 100
@@ -144,8 +159,12 @@ def main():
             position["stop_loss"]
         )
         
+        # Skip if analysis failed
+        if analysis is None:
+            continue
+        
         positions_text += f"""
-**{ticker}** | Entry: ${position['entry']:.2f} | Current: ${current:.2f}
+**{ticker}** | Entry: ${position['entry']:.2f} | Current: ${float(current):.2f}
 ├─ P&L: {analysis['pnl_pct']:+.1f}% | RSI: {analysis['rsi']:.0f if analysis['rsi'] else 'N/A'}
 ├─ R/R to T1: 1:{analysis['rr_t1']:.1f} | R/R to T2: 1:{analysis['rr_t2']:.1f}
 ├─ Stop Loss: ${position['stop_loss']:.2f} | Targets: ${position['target_1']:.2f} / ${position['target_2']:.2f}

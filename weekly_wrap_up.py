@@ -26,7 +26,9 @@ def get_current_price(ticker):
     try:
         data = yf.download(ticker, period="1d", interval="1m", auto_adjust=True, progress=False)
         if len(data) > 0:
-            return data['Close'].iloc[-1]
+            price = data['Close'].iloc[-1]
+            # Ensure we return a scalar value, not a Series
+            return float(price) if price is not None and not pd.isna(price) else None
         return None
     except:
         return None
@@ -100,7 +102,7 @@ Use this template to fill in your actual trades:
         current = get_current_price(ticker)
         rsi = calculate_rsi(ticker)
         
-        if current:
+        if current is not None and not pd.isna(current):
             pnl = ((current - setup["entry"]) / setup["entry"]) * 100
             
             if current >= setup["target_2"]:
@@ -116,7 +118,7 @@ Use this template to fill in your actual trades:
                 status_emoji = "🔴"
                 text = f"LOSS {pnl:.1f}%"
             
-            setup_status += f"{status_emoji} **{ticker}**: ${current:.2f} ({text}) | RSI: {rsi:.0f if rsi is not None else 'N/A'}\n"
+            setup_status += f"{status_emoji} **{ticker}**: ${float(current):.2f} ({text}) | RSI: {rsi:.0f if rsi is not None and not pd.isna(rsi) else 'N/A'}\n"
     
     embed.add_embed_field(
         name="🎯 TOP SETUPS THIS WEEK",
