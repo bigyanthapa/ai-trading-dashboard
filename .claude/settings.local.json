@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh workflow run entry_alert.yml)",
+      "Bash(gh workflow run premarket_alert.yml)",
+      "Bash(gh workflow run position_mgmt.yml)",
+      "Bash(gh workflow run weekly_wrap_up.yml)",
+      "Bash(python entry_alert.py)",
+      "Bash(python position_mgmt_alert.py)",
+      "Bash(python weekly_wrap_up.py)",
+      "Bash(python -m py_compile entry_alert.py)",
+      "Bash(python -m py_compile position_mgmt_alert.py)",
+      "Bash(python -m py_compile weekly_wrap_up.py)",
+      "Bash(python -m py_compile premarket_alert.py)",
+      "Bash(python debug_test.py)",
+      "Bash(python test_position_mgmt.py)",
+      "Bash(python test_entry_alert.py)",
+      "Bash(python debug_position_mgmt.py)",
+      "Bash(git add position_mgmt_alert.py entry_alert.py weekly_wrap_up.py)",
+      "Bash(git add -A)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
