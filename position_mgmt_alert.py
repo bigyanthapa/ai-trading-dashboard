@@ -67,18 +67,25 @@ def get_current_price(ticker):
 def analyze_position(ticker, entry, current, target_1, target_2, stop_loss):
     """Analyze position and provide action"""
     
-    # Ensure current is a scalar value
-    if hasattr(current, 'iloc'):
-        current = float(current.iloc[-1])
-    elif current is None or (hasattr(current, '__len__') and len(current) == 0):
-        return None
-    else:
-        try:
-            current = float(current)
-            if pd.isna(current):
-                return None
-        except (TypeError, ValueError):
+    # Convert current to a scalar float value safely
+    try:
+        # Handle pandas Series or DataFrame
+        if hasattr(current, 'iloc'):
+            current = current.iloc[-1] if len(current) > 0 else None
+        
+        # Handle None or NaN
+        if current is None:
             return None
+        
+        # Convert to float and check for NaN
+        current_float = float(current)
+        if pd.isna(current_float):
+            return None
+            
+        current = current_float
+        
+    except (TypeError, ValueError, IndexError, AttributeError):
+        return None
     
     # Calculate metrics
     pnl_pct = ((current - entry) / entry) * 100
@@ -113,7 +120,8 @@ def analyze_position(ticker, entry, current, target_1, target_2, stop_loss):
         action += f"\n└─ Buy dip if support holding"
         color = "e74c3c"
     else:
-        action = f"🟢 HOLD FULL POSITION - RSI {rsi:.0f if rsi is not None else 'N/A'}"
+        rsi_str = f"{rsi:.0f}" if rsi is not None else "N/A"
+        action = f"🟢 HOLD FULL POSITION - RSI {rsi_str}"
         action += f"\n└─ Wait for Target 1 at ${target_1:.2f}"
         color = "3498db"
     
@@ -165,7 +173,7 @@ def main():
         
         positions_text += f"""
 **{ticker}** | Entry: ${position['entry']:.2f} | Current: ${float(current):.2f}
-├─ P&L: {analysis['pnl_pct']:+.1f}% | RSI: {analysis['rsi']:.0f if analysis['rsi'] else 'N/A'}
+├─ P&L: {analysis['pnl_pct']:+.1f}% | RSI: {analysis['rsi']:.0f if analysis['rsi'] is not None else 'N/A'}
 ├─ R/R to T1: 1:{analysis['rr_t1']:.1f} | R/R to T2: 1:{analysis['rr_t2']:.1f}
 ├─ Stop Loss: ${position['stop_loss']:.2f} | Targets: ${position['target_1']:.2f} / ${position['target_2']:.2f}
 └─ {analysis['action']}

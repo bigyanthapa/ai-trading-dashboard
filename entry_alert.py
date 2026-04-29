@@ -117,7 +117,8 @@ def get_rsi_status(ticker):
         if len(data) < 14:
             return None
         rsi = calculate_rsi(data['Close']).iloc[-1]
-        return rsi
+        # Ensure we return a scalar value
+        return float(rsi) if rsi is not None and not pd.isna(rsi) else None
     except:
         return None
 
@@ -151,7 +152,7 @@ def main():
             continue
         
         rsi = get_rsi_status(ticker)
-        rsi_text = f"(RSI: {rsi:.0f})" if rsi is not None and not pd.isna(rsi) else ""
+        rsi_text = f"(RSI: {rsi:.0f})" if rsi is not None else ""
         
         entry_text += f"""
 {setup['conviction']} **{ticker}** {setup['status']}
