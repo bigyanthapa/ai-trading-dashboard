@@ -12,12 +12,12 @@ on:
       force_alert:
         description: 'Force send alert regardless of crash threshold'
         required: false
-        default: 'false'
+        default: false
         type: boolean
       test_mode:
         description: 'Run in test mode (any date)'
         required: false
-        default: 'true'
+        default: true
         type: boolean
 
 jobs:

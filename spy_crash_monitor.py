@@ -502,15 +502,22 @@ def main():
     """Main crash monitoring function"""
     print("Starting SPY Crash Monitor (FOMC Transition Watch)...")
     
+    # Check environment variables
+    force_alert = os.getenv('FORCE_ALERT', 'false').lower() == 'true'
+    test_mode = os.getenv('TEST_MODE', 'false').lower() == 'true'
+    
+    print(f"Force Alert: {force_alert}")
+    print(f"Test Mode: {test_mode}")
+    
     # Check if we're in the target window (May 15 - June 15, 2026)
     current_date = datetime.now()
     target_start = datetime(2026, 5, 15)
     target_end = datetime(2026, 6, 15)
     
-    # For testing, allow current dates too
-    if current_date < target_start and current_date.year != 2026:
-        # Allow testing in current year
-        print("Outside target window, but running for testing purposes...")
+    # Allow testing in current year or if test_mode is enabled
+    if current_date < target_start and current_date.year != 2026 and not test_mode:
+        print("Outside target window and not in test mode. Exiting.")
+        return
     
     # Get SPY crash data
     spy_price, spy_high, crash_pct = get_spy_data()
@@ -530,11 +537,12 @@ def main():
     print(f"Crash Severity: {crash_severity} | Action: {action}")
     print(f"Stocks in buy zones: {len(stocks_to_buy)}")
     
-    # Send alert if crash is significant (>= 10%) OR stocks are in buy zones
-    if crash_pct <= -5.0 or len(stocks_to_buy) > 0:
+    # Send alert if crash is significant (>= 5%) OR stocks are in buy zones OR force_alert is enabled
+    if crash_pct <= -5.0 or len(stocks_to_buy) > 0 or force_alert:
         send_crash_alert(spy_price, spy_high, crash_pct, stocks_to_buy, crash_severity, action)
+        print(f"Alert sent! Crash: {crash_pct:.1f}%, Stocks in buy zone: {len(stocks_to_buy)}, Force: {force_alert}")
     else:
-        print("No significant crash detected, no alert sent.")
+        print(f"No significant crash detected (SPY: {crash_pct:.1f}%), no alert sent.")
 
 if __name__ == "__main__":
     main()
