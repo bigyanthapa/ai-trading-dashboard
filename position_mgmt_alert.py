@@ -69,22 +69,32 @@ def analyze_position(ticker, entry, current, target_1, target_2, stop_loss):
     
     # Convert current to a scalar float value safely
     try:
-        # Handle pandas Series or DataFrame
-        if hasattr(current, 'iloc'):
+        # Handle pandas Series or DataFrame - be extra careful
+        if hasattr(current, 'iloc') and callable(getattr(current, 'iloc', None)):
             current = current.iloc[-1] if len(current) > 0 else None
+        elif hasattr(current, '__getitem__') and hasattr(current, '__len__') and not isinstance(current, str):
+            # Handle other array-like objects
+            current = current[-1] if len(current) > 0 else None
         
         # Handle None or NaN
         if current is None:
             return None
         
-        # Convert to float and check for NaN
-        current_float = float(current)
-        if pd.isna(current_float):
+        # Convert to float and check for NaN - extra safety
+        try:
+            current_float = float(current)
+        except (TypeError, ValueError):
+            return None
+            
+        # Check for NaN using different methods
+        if current_float != current_float:  # NaN check that doesn't rely on pandas
+            return None
+        if str(current_float).lower() in ['nan', 'inf', '-inf']:
             return None
             
         current = current_float
         
-    except (TypeError, ValueError, IndexError, AttributeError):
+    except Exception:
         return None
     
     # Calculate metrics
@@ -155,8 +165,10 @@ def main():
     positions_text = ""
     for ticker, position in SAMPLE_POSITIONS.items():
         current = get_current_price(ticker)
+        print(f"DEBUG: {ticker} - get_current_price returned: {current} (type: {type(current)})")
         if current is None:
             current = position["current"]
+        print(f"DEBUG: {ticker} - final current: {current} (type: {type(current)})")
         
         analysis = analyze_position(
             ticker,
