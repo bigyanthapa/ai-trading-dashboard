@@ -235,9 +235,12 @@ def main():
         if analysis is None:
             continue
         
+        # Format RSI safely outside f-string
+        rsi_display = f"{analysis['rsi']:.0f}" if analysis['rsi'] is not None else "N/A"
+        
         positions_text += f"""
 **{ticker}** | Entry: ${position['entry']:.2f} | Current: ${float(current):.2f}
-├─ P&L: {analysis['pnl_pct']:+.1f}% | RSI: {analysis['rsi']:.0f if analysis['rsi'] is not None else 'N/A'}
+├─ P&L: {analysis['pnl_pct']:+.1f}% | RSI: {rsi_display}
 ├─ R/R to T1: 1:{analysis['rr_t1']:.1f} | R/R to T2: 1:{analysis['rr_t2']:.1f}
 ├─ Stop Loss: ${position['stop_loss']:.2f} | Targets: ${position['target_1']:.2f} / ${position['target_2']:.2f}
 └─ {analysis['action']}
