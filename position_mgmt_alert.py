@@ -48,10 +48,26 @@ def calculate_rsi(ticker):
         ema_down = down.ewm(com=13, adjust=False).mean()
         rs = ema_up / ema_down
         rsi = 100 - (100 / (1 + rs))
+        
+        # Multiple attempts to get a scalar value
         rsi_value = rsi.iloc[-1]
         
-        # Ensure we return a scalar value
-        return float(rsi_value) if rsi_value is not None and not pd.isna(rsi_value) else None
+        # Extra aggressive conversion - handle all possible cases
+        if hasattr(rsi_value, 'iloc'):
+            # If it's still a Series, extract further
+            rsi_value = rsi_value.iloc[-1]
+        if hasattr(rsi_value, 'item'):
+            # Use pandas item() method to get scalar
+            rsi_value = rsi_value.item()
+        
+        # Final conversion to float
+        final_rsi = float(rsi_value)
+        
+        # Return None for invalid values
+        if pd.isna(final_rsi) or final_rsi != final_rsi:  # NaN check
+            return None
+            
+        return final_rsi
     except:
         return None
 
@@ -122,32 +138,47 @@ def analyze_position(ticker, entry, current, target_1, target_2, stop_loss):
         action += f"\n└─ Close full position, lock in gains"
         color = "1abc9c"
     elif rsi is not None:
-        # Safely convert RSI to scalar if needed
+        # Ultra-safe RSI handling - no direct comparisons with potentially problematic objects
         try:
-            if hasattr(rsi, 'iloc'):
-                rsi_val = float(rsi.iloc[-1])
-            else:
-                rsi_val = float(rsi)
+            # Multiple conversion attempts
+            rsi_val = rsi
             
-            if rsi_val > 75:
-                action = f"🟡 TIGHTEN STOPS - RSI {rsi_val:.0f} (overbought)"
+            # Convert Series to scalar aggressively 
+            if hasattr(rsi_val, 'iloc'):
+                rsi_val = rsi_val.iloc[-1]
+            if hasattr(rsi_val, 'item'):
+                rsi_val = rsi_val.item()
+            if hasattr(rsi_val, 'iloc'):  # Double check
+                rsi_val = rsi_val.iloc[-1]
+                
+            # Force to float
+            rsi_float = float(rsi_val)
+            
+            # Validate it's a real number
+            if rsi_float != rsi_float:  # NaN check
+                raise ValueError("RSI is NaN")
+                
+            # Now safe to do comparisons
+            if rsi_float > 75.0:
+                action = f"🟡 TIGHTEN STOPS - RSI {rsi_float:.0f} (overbought)"
                 action += f"\n└─ Move stop to ${entry + (risk_per_share * 0.5):.2f} (lock in half profit)"
                 color = "f39c12"
-            elif rsi_val > 65:
-                action = f"🟢 TRAIL STOP - RSI {rsi_val:.0f} (strong)"
+            elif rsi_float > 65.0:
+                action = f"🟢 TRAIL STOP - RSI {rsi_float:.0f} (strong)"
                 action += f"\n└─ Move stop to breakeven + 2% (${entry * 1.02:.2f})"
                 color = "3498db"
-            elif rsi_val < 30:
-                action = f"🟢 ADD TO POSITION - RSI {rsi_val:.0f} (oversold)"
+            elif rsi_float < 30.0:
+                action = f"🟢 ADD TO POSITION - RSI {rsi_float:.0f} (oversold)"
                 action += f"\n└─ Buy dip if support holding"
                 color = "e74c3c"
             else:
-                rsi_str = f"{rsi_val:.0f}"
-                action = f"🟢 HOLD FULL POSITION - RSI {rsi_str}"
+                action = f"🟢 HOLD FULL POSITION - RSI {rsi_float:.0f}"
                 action += f"\n└─ Wait for Target 1 at ${target_1:.2f}"
                 color = "3498db"
-        except (TypeError, ValueError, AttributeError):
-            # If RSI conversion fails, treat as no RSI data
+                
+        except Exception as e:
+            # If any RSI processing fails, treat as no RSI data
+            print(f"DEBUG: RSI processing failed: {e}")
             action = f"🟢 HOLD FULL POSITION - RSI N/A"
             action += f"\n└─ Wait for Target 1 at ${target_1:.2f}"
             color = "3498db"
