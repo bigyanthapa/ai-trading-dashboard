@@ -48,7 +48,10 @@ def calculate_rsi(ticker):
         ema_down = down.ewm(com=13, adjust=False).mean()
         rs = ema_up / ema_down
         rsi = 100 - (100 / (1 + rs))
-        return rsi.iloc[-1]
+        rsi_value = rsi.iloc[-1]
+        
+        # Ensure we return a scalar value
+        return float(rsi_value) if rsi_value is not None and not pd.isna(rsi_value) else None
     except:
         return None
 
@@ -107,6 +110,7 @@ def analyze_position(ticker, entry, current, target_1, target_2, stop_loss):
     
     # Get RSI
     rsi = calculate_rsi(ticker)
+    print(f"DEBUG: RSI for {ticker}: {rsi} (type: {type(rsi)})")
     
     # Determine action
     if current >= target_1 and current < target_2:
@@ -117,21 +121,38 @@ def analyze_position(ticker, entry, current, target_1, target_2, stop_loss):
         action = f"🟢🟢 HIT TARGET 2 - BOOK REMAINING PROFIT at ${target_2:.2f}"
         action += f"\n└─ Close full position, lock in gains"
         color = "1abc9c"
-    elif rsi is not None and rsi > 75:
-        action = f"🟡 TIGHTEN STOPS - RSI {rsi:.0f} (overbought)"
-        action += f"\n└─ Move stop to ${entry + (risk_per_share * 0.5):.2f} (lock in half profit)"
-        color = "f39c12"
-    elif rsi is not None and rsi > 65:
-        action = f"🟢 TRAIL STOP - RSI {rsi:.0f} (strong)"
-        action += f"\n└─ Move stop to breakeven + 2% (${entry * 1.02:.2f})"
-        color = "3498db"
-    elif rsi is not None and rsi < 30:
-        action = f"🟢 ADD TO POSITION - RSI {rsi:.0f} (oversold)"
-        action += f"\n└─ Buy dip if support holding"
-        color = "e74c3c"
+    elif rsi is not None:
+        # Safely convert RSI to scalar if needed
+        try:
+            if hasattr(rsi, 'iloc'):
+                rsi_val = float(rsi.iloc[-1])
+            else:
+                rsi_val = float(rsi)
+            
+            if rsi_val > 75:
+                action = f"🟡 TIGHTEN STOPS - RSI {rsi_val:.0f} (overbought)"
+                action += f"\n└─ Move stop to ${entry + (risk_per_share * 0.5):.2f} (lock in half profit)"
+                color = "f39c12"
+            elif rsi_val > 65:
+                action = f"🟢 TRAIL STOP - RSI {rsi_val:.0f} (strong)"
+                action += f"\n└─ Move stop to breakeven + 2% (${entry * 1.02:.2f})"
+                color = "3498db"
+            elif rsi_val < 30:
+                action = f"🟢 ADD TO POSITION - RSI {rsi_val:.0f} (oversold)"
+                action += f"\n└─ Buy dip if support holding"
+                color = "e74c3c"
+            else:
+                rsi_str = f"{rsi_val:.0f}"
+                action = f"🟢 HOLD FULL POSITION - RSI {rsi_str}"
+                action += f"\n└─ Wait for Target 1 at ${target_1:.2f}"
+                color = "3498db"
+        except (TypeError, ValueError, AttributeError):
+            # If RSI conversion fails, treat as no RSI data
+            action = f"🟢 HOLD FULL POSITION - RSI N/A"
+            action += f"\n└─ Wait for Target 1 at ${target_1:.2f}"
+            color = "3498db"
     else:
-        rsi_str = f"{rsi:.0f}" if rsi is not None else "N/A"
-        action = f"🟢 HOLD FULL POSITION - RSI {rsi_str}"
+        action = f"🟢 HOLD FULL POSITION - RSI N/A"
         action += f"\n└─ Wait for Target 1 at ${target_1:.2f}"
         color = "3498db"
     
